@@ -110,17 +110,13 @@ $('loadBtn').onclick = async () => {
     if (info.demo) { await sleep(700); comments = demoComments(); }
     else {
       let cursor = '';
-      const t0 = Date.now(); // Facebook returns everything at once, so show live progress / elapsed time
-      const tick = platform === 'facebook' ? setInterval(() => {
-        if (!comments.length && !seen) $('progressText').textContent = `جاري التحميل من فيسبوك... ${Math.round((Date.now() - t0) / 1000)} ثانية (ممكن ياخد حوالي دقيقة)`;
-      }, 1000) : 0;
-      let seen = 0;
-      const onProgress = (n) => { seen = n; $('progressText').textContent = `جاري التحميل من فيسبوك... تم جلب ${n} تعليق`; };
+      const onProgress = (n) => { $('progressText').textContent = `جاري التحميل... ${n} تعليق`; }; // Facebook: total is unknown, show the running count
       do {
-        const d = await apiComments(platform, info.id, cursor, onProgress).finally(() => clearInterval(tick));
+        const d = await apiComments(platform, info.id, cursor, onProgress);
         comments.push(...d.comments);
         cursor = d.next || '';
-        $('progressText').textContent = `جاري التحميل... ${comments.length}` + (info.count ? ` من ${info.count}` : '');
+        const pct = info.count ? Math.min(99, Math.round((comments.length / info.count) * 100)) : 0;
+        $('progressText').textContent = info.count ? `جاري التحميل... ${pct}% (${comments.length} من ${info.count})` : `جاري التحميل... ${comments.length}`;
       } while (cursor);
     }
     $('progress').hidden = true; $('loadBtn').textContent = 'إعادة تحميل التعليقات'; $('loadBtn').disabled = false;
