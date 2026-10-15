@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>جوائز مستعملينجو</title>
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <img src="logo.png" alt="مستعملينجو" class="logo"><span class="brand">جوائز مستعملينجو</span>
+</header>
+
+<main class="wrap">
+  <h1 class="title">أداة سحب الفائزين من التعليقات</h1>
+  <p class="sub">اختر المنصة، ضع رابط الفيديو، وسيتم اختيار الفائزين بشكل عشوائي</p>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-p="tiktok"><svg viewBox="0 0 24 24"><path d="M16.6 5.8A4.3 4.3 0 0 1 15.5 3h-3.1v12.4a2.6 2.6 0 1 1-2.6-2.6c.3 0 .5 0 .8.1V9.7a5.7 5.7 0 1 0 4.9 5.7V9a7.4 7.4 0 0 0 4.3 1.4V7.3a4.3 4.3 0 0 1-3.2-1.5z"/></svg>تيك توك</button>
+    <button class="tab" data-p="facebook"><svg viewBox="0 0 24 24"><path d="M13.5 21v-7.7h2.6l.4-3h-3V8.4c0-.9.3-1.5 1.5-1.5h1.6V4.2c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9v2.3H7.9v3h2.6V21z"/></svg>فيسبوك</button>
+    <button class="tab" data-p="youtube"><svg viewBox="0 0 24 24"><path d="M21.6 7.2a2.5 2.5 0 0 0-1.8-1.8C18.200 5 12 5 12 5s-6.200 0-7.800.4A2.5 2.5 0 0 0 2.400 7.200C2 8.800 2 12 2 12s0 3.200.4 4.800a2.500 2.500 0 0 0 1.800 1.800C5.800 19 12 19 12 19s6.200 0 7.800-.4a2.500 2.500 0 0 0 1.800-1.800c.4-1.600.4-4.800.4-4.800s0-3.200-.4-4.800zM10 15V9l5.200 3z"/></svg>يوتيوب</button>
+  </nav>
+
+  <!-- 1. link -->
+  <section class="card">
+    <form id="searchForm" class="search">
+      <input id="url" type="text" dir="ltr" placeholder="ضع رابط الفيديو هنا" autocomplete="off">
+      <button class="btn" id="searchBtn" type="submit">بحث</button>
+    </form>
+    <p class="hint" id="hint"></p>
+    <p class="error" id="error" hidden></p>
+  </section>
+
+  <!-- 2. video -->
+  <section class="card video" id="videoCard" hidden>
+    <img id="vThumb" alt="">
+    <div class="vinfo">
+      <h3 id="vTitle"></h3>
+      <p id="vAuthor" class="muted"></p>
+      <button class="btn big" id="loadBtn">تحميل التعليقات</button>
+      <div class="progress" id="progress" hidden><span id="progressText"></span></div>
+    </div>
+  </section>
+
+  <!-- 3. settings -->
+  <section class="card setup" id="setupCard" hidden>
+    <div class="count"><b id="cCount">0</b> تعليق<span id="cUnique" class="muted"></span></div>
+    <label class="field">
+      <span>عدد الفائزين</span>
+      <input id="winners" type="number" min="1" value="1" inputmode="numeric">
+    </label>
+    <div class="stats" id="aiStatus"></div>
+    <button class="btn big green" id="startBtn">ابدأ السحب</button>
+  </section>
+</main>
+
+<footer class="pgfoot"><div class="credit inline">by Omar Ahmed <i>·</i> CodeError</div></footer>
+
+<!-- draw overlay -->
+<div class="overlay" id="overlay" hidden>
+  <div class="ovHead"><img src="logo.png" alt=""><span>جوائز مستعملينجو</span></div>
+  <div class="stage" id="countStage"><div class="num" id="num">10</div><p>استعد للسحب...</p></div>
+  <div class="stage" id="wheelStage" hidden>
+    <div class="wheelBox" id="wheelBox">
+      <div class="pointer"></div>
+      <canvas id="wheel" width="900" height="900"></canvas>
+    </div>
+  </div>
+  <div class="flash" id="flash"></div>
+  <div class="results" id="results" hidden>
+    <h2>🎉 الفائزون</h2>
+    <div class="list" id="winList"></div>
+    <div class="actions">
+      <button class="btn green" id="again">إعادة السحب</button>
+      <button class="btn ghost" id="close">إغلاق</button>
+    </div>
+  </div>
+  <div class="credit">by Omar Ahmed <i>·</i> CodeError</div>
+  <canvas id="confetti"></canvas>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
