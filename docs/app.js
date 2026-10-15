@@ -25,16 +25,6 @@ const call = async (path, params) => {
 };
 const apiInfo = async (platform, url) => { await serverReady; return SERVER ? call('info', { platform, url }) : Engine.info(platform, url); };
 const apiComments = async (platform, id, cursor) => { await serverReady; return SERVER ? call('comments', { platform, id, cursor }) : Engine.comments(platform, id, cursor); };
-const apiClassify = async (texts) => {
-  await serverReady;
-  if (!SERVER) return Engine.classify(texts);
-  const r = await fetch('api/classify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texts }) });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.error || 'حصل خطأ');
-  return d.ids;
-};
-const showError = (m) => { $('error').textContent = m || ''; $('error').hidden = !m; };
-
 // ---------- demo data ----------
 const DEMO_NAMES = ['أحمد علي','محمد سمير','سارة محمود','منى حسن','يوسف إبراهيم','نور الدين','هدى خالد','كريم عادل','ياسمين فؤاد','عمر طارق','دينا مصطفى','حسام رمضان','ريم جمال','مصطفى سعيد','آية عبدالله','خالد وليد','فاطمة الزهراء','إسلام صلاح','هاجر نبيل','عبدالرحمن شريف'];
 const DEMO_TEXT = ['أنا عايز أكسب! 🙏','ربنا يوفقك يا مستعملينجو','مشاركة في المسابقة ❤️','يارب أكون الفايز','فيديو جميل جدا 👏','متابع من زمان وبحبكم','نفسي أكسب المرة دي 🤞','الله ينور عليكم'];
@@ -59,12 +49,6 @@ function fillVideo() {
   $('vAuthor').textContent = (info.author ? info.author + ' · ' : '') + (info.count ? info.count + ' تعليق' : '');
   $('loadBtn').disabled = false; $('loadBtn').textContent = comments.length ? 'إعادة تحميل التعليقات' : 'تحميل التعليقات';
 }
-function aiSummary() {
-  const box = $('aiStatus');
-  if (!comments.length || !comments.every((c) => c.want !== undefined)) { box.innerHTML = ''; return; }
-  const out = comments.filter((c) => c.want === false).length;
-  box.innerHTML = `<div class="stat red"><b>${out}</b><span>تعليق مستبعد</span></div><div class="stat green"><b>${uniqueCount()}</b><span>شخص هيدخلوا السحب</span></div>`;
-}
 function render(s) { // draw the UI for a step from current data (used on refresh / Back)
   showToken++; stopConfetti(); // cancels a running countdown/wheel
   if (s === 'results' && !(lastWinners && lastWinners.length)) s = 'setup';
@@ -75,7 +59,7 @@ function render(s) { // draw the UI for a step from current data (used on refres
   $('videoCard').hidden = !(info && s !== 'search');
   $('setupCard').hidden = !(comments.length && (s === 'setup' || s === 'results'));
   if (info) fillVideo();
-  if (comments.length) { updateSetup(); aiSummary(); }
+  if (comments.length) updateSetup();
   const ov = $('overlay'); ov.hidden = s !== 'results';
   if (s === 'results') {
     $('countStage').hidden = true; $('wheelStage').hidden = true; $('flash').classList.remove('on');
@@ -93,7 +77,7 @@ function applyPlatformUI(p) {
 }
 function setPlatform(p) { applyPlatformUI(p); resetAll(); go('search'); }
 function resetAll() {
-  info = null; comments = []; lastWinners = null; showError(''); $('aiStatus').textContent = '';
+  info = null; comments = []; lastWinners = null; showError('');
   $('videoCard').hidden = true; $('setupCard').hidden = true; $('progress').hidden = true;
 }
 $('tabs').onclick = (e) => { const b = e.target.closest('.tab'); if (b && b.dataset.p !== platform) setPlatform(b.dataset.p); };
@@ -119,7 +103,7 @@ $('searchForm').onsubmit = async (e) => {
 $('loadBtn').onclick = async () => {
   $('loadBtn').disabled = true; $('setupCard').hidden = true; showError('');
   $('progress').hidden = false; $('progressText').textContent = 'جاري التحميل... 0';
-  comments = []; lastWinners = null; $('aiStatus').textContent = '';
+  comments = []; lastWinners = null;
   try {
     if (info.demo) { await sleep(700); comments = demoComments(); }
     else {
@@ -136,7 +120,6 @@ $('loadBtn').onclick = async () => {
     comments = comments.filter((c) => c.text && c.text.trim() && !(info.owner && String(c.uid) === String(info.owner)) && !/مستعملينجو/.test(c.name || ''));
     if (!comments.length) return showError('لا توجد تعليقات على هذا الفيديو');
     updateSetup(); $('setupCard').hidden = false; go('setup');
-    autoClassify();
     $('setupCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (err) {
     $('progress').hidden = true; $('loadBtn').disabled = false; showError(err.message);
@@ -144,34 +127,12 @@ $('loadBtn').onclick = async () => {
   }
 };
 const personOf = (c) => c.uid || c.name;
-const eligible = () => comments.filter((c) => c.want !== false); // AI-approved (or not yet classified)
+const eligible = () => comments; // every loaded comment takes part, no filtering
 const uniqueCount = () => new Set(eligible().map(personOf)).size;
 function updateSetup() {
   $('cCount').textContent = comments.length;
   $('cUnique').textContent = ` (من ${new Set(comments.map(personOf)).size} شخص)`;
   $('winners').max = uniqueCount();
-}
-
-// ---------- AI filter (automatic, runs once per loaded video) ----------
-async function autoClassify() { // runs right after comments load so the stats are visible before drawing
-  const mine = comments, btn = $('startBtn');
-  btn.disabled = true; $('aiStatus').innerHTML = '<div class="stat wait">🤖 جاري فرز المشاركين بالذكاء الاصطناعي...</div>';
-  try { await classifyAll(); } catch (err) { if (mine === comments) showError(err.message + ' (دوس "ابدأ السحب" لإعادة المحاولة)'); }
-  if (mine !== comments) return;
-  btn.disabled = false; btn.textContent = 'ابدأ السحب';
-  if (comments.every((c) => c.want !== undefined)) { aiSummary(); updateSetup(); save(); } else $('aiStatus').innerHTML = '';
-}
-async function classifyAll() {
-  if (info.demo) { comments.forEach((c) => { c.want = true; }); return; }
-  if (comments.every((c) => c.want !== undefined)) return;
-  const B = 80;
-  for (let i = 0; i < comments.length; i += B) {
-    $('startBtn').textContent = `جاري فرز المشاركين... ${Math.min(i + B, comments.length)} / ${comments.length}`;
-    const batch = comments.slice(i, i + B);
-    const yes = new Set(await apiClassify(batch.map((c) => c.text)));
-    batch.forEach((c, j) => { c.want = yes.has(j); });
-  }
-  aiSummary(); save();
 }
 
 // ---------- draw ----------
@@ -187,10 +148,7 @@ async function startDraw() {
   showError('');
   const btn = $('startBtn'); btn.disabled = true;
   try {
-    await classifyAll();
-    updateSetup();
     const max = uniqueCount();
-    if (!max) return showError('لا يوجد أي تعليق من شخص عايز يشارك في المسابقة');
     if (n > max) return showError(`عدد الفائزين أكبر من عدد المشاركين (${max})`);
     await runShow(pickWinners(n));
   } catch (err) { showError(err.message); }
@@ -331,7 +289,7 @@ function stopConfetti() { cancelAnimationFrame(cfRaf); const cv = $('confetti');
 })();
 
 // ---------- settings (keys for static hosting; stored only in this browser) ----------
-const KEYS = ['youtube', 'gemini', 'apify'];
+const KEYS = ['youtube', 'apify'];
 const readKeys = () => { try { return JSON.parse(localStorage.getItem('giveaway_keys') || '{}'); } catch { return {}; } };
 $('gear').onclick = () => { const k = readKeys(); KEYS.forEach((n) => { $('key_' + n).value = k[n] || ''; }); $('settings').hidden = false; };
 $('settingsClose').onclick = () => { $('settings').hidden = true; };

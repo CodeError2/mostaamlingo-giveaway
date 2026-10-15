@@ -1,6 +1,6 @@
 # جوائز مستعملينجو — Comment Giveaway Picker
 
-Pick giveaway winners from the comments of a TikTok / Facebook / YouTube video, with an AI filter that keeps only comments from people who want to enter, a countdown, a wheel animation and a winners screen.
+Pick giveaway winners from the comments of a TikTok / Facebook / YouTube video, a countdown, a wheel animation and a winners screen.
 
 Zero npm dependencies (Node 18+).
 
@@ -17,6 +17,5 @@ The `docs/` folder is a fully static version: open the site, click ⚙️, and p
 | TikTok | nothing (unofficial tikwm.com API) |
 | YouTube | `YOUTUBE_API_KEY` (YouTube Data API v3) |
 | Facebook | `APIFY_TOKEN` (easiest) or `FACEBOOK_ACCESS_TOKEN` |
-| AI filter | `GEMINI_API_KEY` (falls through several models when a daily quota runs out) |
 
 by Omar Ahmed · CodeError
