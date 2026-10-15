@@ -24,7 +24,7 @@ const call = async (path, params) => {
   return d;
 };
 const apiInfo = async (platform, url) => { await serverReady; return SERVER ? call('info', { platform, url }) : Engine.info(platform, url); };
-const apiComments = async (platform, id, cursor) => { await serverReady; return SERVER ? call('comments', { platform, id, cursor }) : Engine.comments(platform, id, cursor); };
+const apiComments = async (platform, id, cursor, onProgress) => { await serverReady; return SERVER ? call('comments', { platform, id, cursor }) : Engine.comments(platform, id, cursor, onProgress); };
 const showError = (m) => { $('error').textContent = m || ''; $('error').hidden = !m; };
 
 // ---------- demo data ----------
@@ -110,8 +110,14 @@ $('loadBtn').onclick = async () => {
     if (info.demo) { await sleep(700); comments = demoComments(); }
     else {
       let cursor = '';
+      const t0 = Date.now(); // Facebook returns everything at once, so show live progress / elapsed time
+      const tick = platform === 'facebook' ? setInterval(() => {
+        if (!comments.length && !seen) $('progressText').textContent = `جاري التحميل من فيسبوك... ${Math.round((Date.now() - t0) / 1000)} ثانية (ممكن ياخد حوالي دقيقة)`;
+      }, 1000) : 0;
+      let seen = 0;
+      const onProgress = (n) => { seen = n; $('progressText').textContent = `جاري التحميل من فيسبوك... تم جلب ${n} تعليق`; };
       do {
-        const d = await apiComments(platform, info.id, cursor);
+        const d = await apiComments(platform, info.id, cursor, onProgress).finally(() => clearInterval(tick));
         comments.push(...d.comments);
         cursor = d.next || '';
         $('progressText').textContent = `جاري التحميل... ${comments.length}` + (info.count ? ` من ${info.count}` : '');

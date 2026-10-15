@@ -70,15 +70,29 @@ const Engine = (() => {
     if (!/facebook\.com|fb\.watch|fb\.com/.test(url)) throw new UserError('رابط فيسبوك غير صحيح');
     return { id: url, title: 'فيديو فيسبوك', author: '', owner: '', thumb: '', count: 0 };
   }
-  async function fbComments(url) {
-    const token = need('apify', 'توكن Apify');
-    const d = await getJson(`https://api.apify.com/v2/acts/apify~facebook-comments-scraper/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=280`, {
+  async function fbComments(url, _cursor, onProgress) {
+    const token = encodeURIComponent(need('apify', 'توكن Apify'));
+    const api = 'https://api.apify.com/v2';
+    // start the run asynchronously so we can report progress while it scrapes
+    const run = await getJson(`${api}/acts/apify~facebook-comments-scraper/runs?token=${token}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ startUrls: [{ url }], resultsLimit: 1000, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }),
     });
-    if (!Array.isArray(d)) throw new UserError('Apify: ' + ((d && d.error && d.error.message) || 'تعذر جلب التعليقات (تأكد من التوكن والرصيد)'));
+    if (!run.data) throw new UserError('Apify: ' + ((run.error && run.error.message) || 'تعذر بدء الجلب (تأكد من التوكن والرصيد)'));
+    const runId = run.data.id, ds = run.data.defaultDatasetId, t0 = Date.now();
+    for (;;) {
+      await sleep(2000);
+      const [st, d] = await Promise.all([getJson(`${api}/actor-runs/${runId}?token=${token}`), getJson(`${api}/datasets/${ds}?token=${token}`)]);
+      if (onProgress && d.data) onProgress(d.data.itemCount || 0);
+      const status = st.data && st.data.status;
+      if (status === 'SUCCEEDED') break;
+      if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(status)) throw new UserError('Apify: فشل الجلب (' + status + ')، تأكد من الرابط والرصيد');
+      if (Date.now() - t0 > 290000) throw new UserError('Apify: استغرق الجلب وقتاً طويلاً، جرّب مرة أخرى');
+    }
+    const items = await getJson(`${api}/datasets/${ds}/items?token=${token}&clean=1`);
+    if (!Array.isArray(items)) throw new UserError('Apify: تعذر قراءة النتائج');
     return {
-      comments: d.filter((c) => c.text && !(c.threadingDepth > 0)).map((c) => ({ uid: c.profileId || c.profileUrl || c.profileName, name: c.profileName || 'مستخدم فيسبوك', text: c.text, avatar: c.profilePicture || '', link: c.commentUrl || '' })),
+      comments: items.filter((c) => c.text && !(c.threadingDepth > 0)).map((c) => ({ uid: c.profileId || c.profileUrl || c.profileName, name: c.profileName || 'مستخدم فيسبوك', text: c.text, avatar: c.profilePicture || '', link: c.commentUrl || '' })),
       next: null,
     };
   }
@@ -86,7 +100,7 @@ const Engine = (() => {
   const P = { youtube: { info: ytInfo, comments: ytComments }, tiktok: { info: ttInfo, comments: ttComments }, facebook: { info: fbInfo, comments: fbComments } };
   return {
     info: (platform, url) => P[platform].info(url),
-    comments: (platform, id, cursor) => P[platform].comments(id, cursor),
+    comments: (platform, id, cursor, onProgress) => P[platform].comments(id, cursor, onProgress),
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
