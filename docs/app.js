@@ -77,7 +77,7 @@ function applyPlatformUI(p) {
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.p === p));
   $('hint').textContent = HINTS[p];
 }
-function setPlatform(p) { applyPlatformUI(p); resetAll(); go('search'); }
+function setPlatform(p) { applyPlatformUI(p); $('url').value = ''; resetAll(); go('search'); $('url').focus(); }
 function resetAll() {
   info = null; comments = []; lastWinners = null; showError('');
   $('videoCard').hidden = true; $('setupCard').hidden = true; $('progress').hidden = true;
