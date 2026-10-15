@@ -14,11 +14,24 @@ const rnd = (n) => { // unbiased crypto random int in [0,n)
 };
 const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const api = async (path, params) => {
-  const r = await fetch(`/api/${path}?` + new URLSearchParams(params));
+// Local mode: talk to server.js (keys in .env). Static mode (GitHub Pages): run the same logic in the browser (keys in ⚙️ settings).
+let SERVER = false;
+const serverReady = fetch('api/ping').then((r) => { SERVER = r.ok; }).catch(() => {}).then(() => { $('gear').hidden = SERVER; });
+const call = async (path, params) => {
+  const r = await fetch(`api/${path}?` + new URLSearchParams(params));
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || 'حصل خطأ');
   return d;
+};
+const apiInfo = async (platform, url) => { await serverReady; return SERVER ? call('info', { platform, url }) : Engine.info(platform, url); };
+const apiComments = async (platform, id, cursor) => { await serverReady; return SERVER ? call('comments', { platform, id, cursor }) : Engine.comments(platform, id, cursor); };
+const apiClassify = async (texts) => {
+  await serverReady;
+  if (!SERVER) return Engine.classify(texts);
+  const r = await fetch('api/classify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texts }) });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'حصل خطأ');
+  return d.ids;
 };
 const showError = (m) => { $('error').textContent = m || ''; $('error').hidden = !m; };
 
@@ -94,7 +107,7 @@ $('searchForm').onsubmit = async (e) => {
   try {
     info = url === 'demo'
       ? { id: 'demo', demo: true, title: 'فيديو تجريبي من مستعملينجو', author: 'مستعملينجو', thumb: 'logo.png', count: 120 }
-      : await api('info', { platform, url });
+      : await apiInfo(platform, url);
     fillVideo();
     $('videoCard').hidden = false;
     go('video');
@@ -112,7 +125,7 @@ $('loadBtn').onclick = async () => {
     else {
       let cursor = '';
       do {
-        const d = await api('comments', { platform, id: info.id, cursor });
+        const d = await apiComments(platform, info.id, cursor);
         comments.push(...d.comments);
         cursor = d.next || '';
         $('progressText').textContent = `جاري التحميل... ${comments.length}` + (info.count ? ` من ${info.count}` : '');
@@ -155,10 +168,7 @@ async function classifyAll() {
   for (let i = 0; i < comments.length; i += B) {
     $('startBtn').textContent = `جاري فرز المشاركين... ${Math.min(i + B, comments.length)} / ${comments.length}`;
     const batch = comments.slice(i, i + B);
-    const r = await fetch('/api/classify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texts: batch.map((c) => c.text) }) });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'حصل خطأ');
-    const yes = new Set(d.ids);
+    const yes = new Set(await apiClassify(batch.map((c) => c.text)));
     batch.forEach((c, j) => { c.want = yes.has(j); });
   }
   aiSummary(); save();
@@ -319,3 +329,15 @@ function stopConfetti() { cancelAnimationFrame(cfRaf); const cv = $('confetti');
   }
   render(s);
 })();
+
+// ---------- settings (keys for static hosting; stored only in this browser) ----------
+const KEYS = ['youtube', 'gemini', 'apify'];
+const readKeys = () => { try { return JSON.parse(localStorage.getItem('giveaway_keys') || '{}'); } catch { return {}; } };
+$('gear').onclick = () => { const k = readKeys(); KEYS.forEach((n) => { $('key_' + n).value = k[n] || ''; }); $('settings').hidden = false; };
+$('settingsClose').onclick = () => { $('settings').hidden = true; };
+$('settings').onclick = (e) => { if (e.target === $('settings')) $('settings').hidden = true; };
+$('settingsSave').onclick = () => {
+  const k = {}; KEYS.forEach((n) => { k[n] = $('key_' + n).value.trim(); });
+  try { localStorage.setItem('giveaway_keys', JSON.stringify(k)); } catch {}
+  $('settings').hidden = true; showError('');
+};

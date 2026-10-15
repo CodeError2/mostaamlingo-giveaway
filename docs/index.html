@@ -12,7 +12,7 @@
 <body>
 
 <header class="top">
-  <img src="logo.png" alt="مستعملينجو" class="logo"><span class="brand">جوائز مستعملينجو</span>
+  <img src="logo.png" alt="مستعملينجو" class="logo"><span class="brand">جوائز مستعملينجو</span><button class="gear" id="gear" type="button" title="الإعدادات" hidden>⚙️</button>
 </header>
 
 <main class="wrap">
@@ -83,6 +83,18 @@
   <canvas id="confetti"></canvas>
 </div>
 
+<div class="modal" id="settings" hidden>
+  <div class="box">
+    <h3>⚙️ المفاتيح</h3>
+    <p class="muted">بتتحفظ في المتصفح ده بس، ومش بتترفع لأي مكان.</p>
+    <label>مفتاح يوتيوب <small class="muted">(YouTube Data API v3)</small><input id="key_youtube" type="password" dir="ltr" autocomplete="off"></label>
+    <label>مفتاح Gemini <small class="muted">(الفرز بالذكاء الاصطناعي)</small><input id="key_gemini" type="password" dir="ltr" autocomplete="off"></label>
+    <label>توكن Apify <small class="muted">(فيسبوك)</small><input id="key_apify" type="password" dir="ltr" autocomplete="off"></label>
+    <p class="muted">تيك توك مش محتاج مفتاح.</p>
+    <div class="actions"><button class="btn green" id="settingsSave">حفظ</button><button class="btn ghost" id="settingsClose">إلغاء</button></div>
+  </div>
+</div>
+<script src="engine.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

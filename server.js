@@ -267,6 +267,7 @@ http
     const u = new URL(req.url, 'http://x');
     if (u.pathname.startsWith('/api/')) {
       try {
+        if (u.pathname === '/api/ping') return send(res, 200, { ok: true });
         if (u.pathname === '/api/classify' && req.method === 'POST') {
           const { texts } = JSON.parse((await readBody(req)) || '{}');
           if (!Array.isArray(texts) || texts.length > 150) throw new UserError('طلب غير صحيح');
@@ -284,8 +285,8 @@ http
       }
     }
     const rel = u.pathname === '/' ? 'index.html' : decodeURIComponent(u.pathname.slice(1));
-    const file = path.join(__dirname, 'public', rel);
-    if (!file.startsWith(path.join(__dirname, 'public'))) return send(res, 403, 'forbidden', 'text/plain');
+    const file = path.join(__dirname, 'docs', rel);
+    if (!file.startsWith(path.join(__dirname, 'docs'))) return send(res, 403, 'forbidden', 'text/plain');
     fs.readFile(file, (err, buf) =>
       err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, buf, MIME[path.extname(file)] || 'application/octet-stream')
     );
