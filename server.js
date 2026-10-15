@@ -228,8 +228,9 @@ async function classify(texts) {
     for (const model of GEMINI_MODELS) {
       if ((modelCooldown.get(model) || 0) > Date.now()) continue;
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY }, body,
-      });
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY }, body, signal: AbortSignal.timeout(40000),
+      }).catch(() => null);
+      if (!res) { modelCooldown.set(model, Date.now() + 30e3); lastErr = 'Gemini بطيء أو لا يرد، جرّب مرة أخرى'; continue; }
       const d = await res.json().catch(() => ({}));
       if (res.status === 429) { // out of quota: daily -> skip this model for an hour, per-minute -> short pause
         const daily = /PerDay/i.test(JSON.stringify(d));

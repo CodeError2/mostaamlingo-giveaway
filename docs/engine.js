@@ -105,8 +105,8 @@ const Engine = (() => {
       for (const model of MODELS) {
         if ((cooldown[model] || 0) > Date.now()) continue;
         let res;
-        try { res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body }); }
-        catch { throw new UserError('تعذر الاتصال بـGemini، تأكد من الإنترنت'); }
+        try { res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body, signal: AbortSignal.timeout(40000) }); }
+        catch { cooldown[model] = Date.now() + 30e3; lastErr = 'Gemini بطيء أو لا يرد، جرّب مرة أخرى'; continue; } // timeout / network: try the next model
         const d = await res.json().catch(() => ({}));
         if (res.status === 429) {
           const daily = /PerDay/i.test(JSON.stringify(d));
