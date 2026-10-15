@@ -25,6 +25,8 @@ const call = async (path, params) => {
 };
 const apiInfo = async (platform, url) => { await serverReady; return SERVER ? call('info', { platform, url }) : Engine.info(platform, url); };
 const apiComments = async (platform, id, cursor) => { await serverReady; return SERVER ? call('comments', { platform, id, cursor }) : Engine.comments(platform, id, cursor); };
+const showError = (m) => { $('error').textContent = m || ''; $('error').hidden = !m; };
+
 // ---------- demo data ----------
 const DEMO_NAMES = ['أحمد علي','محمد سمير','سارة محمود','منى حسن','يوسف إبراهيم','نور الدين','هدى خالد','كريم عادل','ياسمين فؤاد','عمر طارق','دينا مصطفى','حسام رمضان','ريم جمال','مصطفى سعيد','آية عبدالله','خالد وليد','فاطمة الزهراء','إسلام صلاح','هاجر نبيل','عبدالرحمن شريف'];
 const DEMO_TEXT = ['أنا عايز أكسب! 🙏','ربنا يوفقك يا مستعملينجو','مشاركة في المسابقة ❤️','يارب أكون الفايز','فيديو جميل جدا 👏','متابع من زمان وبحبكم','نفسي أكسب المرة دي 🤞','الله ينور عليكم'];
