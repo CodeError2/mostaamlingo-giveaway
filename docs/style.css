@@ -132,3 +132,11 @@ a.win:hover{border-color:var(--green);box-shadow:0 8px 26px #16a34a38}
 .modal label{display:flex;flex-direction:column;gap:5px;font-weight:700;font-size:14px}
 .modal input{border:2px solid var(--line);border-radius:10px;padding:10px;font-size:15px;outline:none}
 .modal input:focus{border-color:var(--blue)}
+
+@media(max-width:560px){
+  .top{padding:8px 50px}
+  .logo{height:56px}
+  .brand{font-size:21px;margin-inline-start:8px;white-space:nowrap}
+  .gear{left:8px;width:36px;height:36px;font-size:18px}
+  .ovHead{padding:0 12px}.ovHead img{height:52px}.ovHead span{font-size:21px;white-space:nowrap}
+}
