@@ -1,0 +1,10 @@
+{
+  "name": "mostaamlingo-giveaway",
+  "main": "index.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "../docs",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  }
+}

@@ -3,7 +3,13 @@
 const Engine = (() => {
   class UserError extends Error {}
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const keys = () => { try { return JSON.parse(localStorage.getItem('giveaway_keys') || '{}'); } catch { return {}; } };
+  const keys = () => { // built-in keys (config.js), overridden by anything saved in ⚙️ settings
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('giveaway_keys') || '{}'); } catch {}
+    const base = (typeof window !== 'undefined' && window.GIVEAWAY_KEYS) || {}, out = { ...base };
+    for (const k in saved) if (saved[k] && String(saved[k]).trim()) out[k] = saved[k];
+    return out;
+  };
   const need = (k, label) => { const v = (keys()[k] || '').trim(); if (!v) throw new UserError(`${label} غير مضبوط. افتح ⚙️ الإعدادات وضع المفتاح`); return v; };
   const getJson = async (url, opt) => {
     let r;

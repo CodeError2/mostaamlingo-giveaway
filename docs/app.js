@@ -23,8 +23,8 @@ const call = async (path, params) => {
   if (!r.ok) throw new Error(d.error || 'حصل خطأ');
   return d;
 };
-const apiInfo = async (platform, url) => { await serverReady; return SERVER ? call('info', { platform, url }) : Engine.info(platform, url); };
-const apiComments = async (platform, id, cursor, onProgress) => { await serverReady; return SERVER ? call('comments', { platform, id, cursor }) : Engine.comments(platform, id, cursor, onProgress); };
+const apiInfo = async (platform, url) => { await serverReady; return SERVER && platform !== 'tiktok' ? call('info', { platform, url }) : Engine.info(platform, url); }; // TikTok goes straight from the browser (tikwm throttles server IPs)
+const apiComments = async (platform, id, cursor, onProgress) => { await serverReady; return SERVER && platform !== 'tiktok' ? call('comments', { platform, id, cursor }) : Engine.comments(platform, id, cursor, onProgress); };
 const showError = (m) => { $('error').textContent = m || ''; $('error').hidden = !m; };
 
 // ---------- demo data ----------
@@ -115,6 +115,7 @@ $('loadBtn').onclick = async () => {
         const d = await apiComments(platform, info.id, cursor, onProgress);
         comments.push(...d.comments);
         cursor = d.next || '';
+        if (d.progress !== undefined && cursor) { onProgress(d.progress); await sleep(2000); continue; } // Facebook via server: poll the run
         const pct = info.count ? Math.min(99, Math.round((comments.length / info.count) * 100)) : 0;
         $('progressText').textContent = info.count ? `جاري التحميل... ${pct}% (${comments.length} من ${info.count})` : `جاري التحميل... ${comments.length}`;
       } while (cursor);
