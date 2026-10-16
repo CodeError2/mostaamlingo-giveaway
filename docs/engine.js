@@ -70,6 +70,9 @@ const Engine = (() => {
     };
   }
 
+  const apifyMsg = (m) => /limit|usage|credit|billing/i.test(m || '')
+    ? 'رصيد جلب فيسبوك المجاني خلص لهذا الشهر (بيتجدد يوم 15 كل شهر). تيك توك ويوتيوب شغالين عادي.'
+    : 'Apify: ' + (m || 'تعذر بدء الجلب (تأكد من التوكن والرصيد)');
   // ---------- Facebook (Apify) ----------
   async function fbInfo(url) {
     need('apify', 'توكن Apify');
@@ -84,7 +87,7 @@ const Engine = (() => {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ startUrls: [{ url }], resultsLimit: 1000, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }),
     });
-    if (!run.data) throw new UserError('Apify: ' + ((run.error && run.error.message) || 'تعذر بدء الجلب (تأكد من التوكن والرصيد)'));
+    if (!run.data) throw new UserError(apifyMsg(run.error && run.error.message));
     const runId = run.data.id, ds = run.data.defaultDatasetId, t0 = Date.now();
     for (;;) {
       await sleep(2000);
