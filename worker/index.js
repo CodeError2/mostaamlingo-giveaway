@@ -67,22 +67,30 @@ const apifyMsg = (m) => /limit|usage|credit|billing/i.test(m || '')
   : 'Apify: ' + (m || 'تعذر بدء الجلب (تأكد من التوكن والرصيد)');
 // ---------- Facebook (Apify, async run polled by the browser so it can show progress) ----------
 const APIFY = 'https://api.apify.com/v2';
+const apifyTokens = (env) => (env.APIFY_TOKENS || env.APIFY_TOKEN || '').split(',').map((t) => t.trim()).filter(Boolean);
+const isQuotaError = (m) => /limit|usage|credit|billing/i.test(m || '');
 async function fbInfo(url, env) {
-  if (!env.APIFY_TOKEN) throw new UserError('توكن Apify غير مضبوط');
+  if (!apifyTokens(env).length) throw new UserError('توكن Apify غير مضبوط');
   if (!/facebook\.com|fb\.watch|fb\.com/.test(url)) throw new UserError('رابط فيسبوك غير صحيح');
   return { id: url, title: 'فيديو فيسبوك', author: '', owner: '', thumb: '', count: 0 };
 }
 async function fbComments(url, cursor, env) {
-  const token = encodeURIComponent(env.APIFY_TOKEN);
-  if (!cursor) { // first call: start the run
-    const run = await getJson(`${APIFY}/acts/apify~facebook-comments-scraper/runs?token=${token}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ startUrls: [{ url }], resultsLimit: 1000, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }),
-    });
-    if (!run.data) throw new UserError(apifyMsg(run.error && run.error.message));
-    return { comments: [], next: `${run.data.id}:${run.data.defaultDatasetId}`, progress: 0 };
+  const tokens = apifyTokens(env);
+  if (!cursor) { // first call: start the run with the first token that still has credit
+    let lastMsg = '';
+    for (let i = 0; i < tokens.length; i++) {
+      const run = await getJson(`${APIFY}/acts/apify~facebook-comments-scraper/runs?token=${encodeURIComponent(tokens[i])}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startUrls: [{ url }], resultsLimit: 1000, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }),
+      });
+      if (run.data) return { comments: [], next: `${i}:${run.data.id}:${run.data.defaultDatasetId}`, progress: 0 };
+      lastMsg = run.error && run.error.message;
+      if (!isQuotaError(lastMsg)) break; // real error (bad link/token): don't burn through the other accounts
+    }
+    throw new UserError(apifyMsg(lastMsg));
   }
-  const [runId, ds] = cursor.split(':');
+  const [idx, runId, ds] = cursor.split(':');
+  const token = encodeURIComponent(tokens[Number(idx)] || tokens[0]);
   const [st, d] = await Promise.all([getJson(`${APIFY}/actor-runs/${runId}?token=${token}`), getJson(`${APIFY}/datasets/${ds}?token=${token}`)]);
   const status = st.data && st.data.status;
   if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(status)) throw new UserError('Apify: فشل الجلب (' + status + ')، تأكد من الرابط والرصيد');
