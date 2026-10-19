@@ -75,7 +75,7 @@ async function fbResolve(url) { // share links (/share/v/..., fb.watch) redirect
   const short = (u) => /facebook\.com\/share\/|fb\.watch/.test(u);
   if (!short(url)) return url;
   for (let i = 0; i < 4; i++) {
-    const res = await fetch(url, { redirect: 'manual', headers: { 'User-Agent': UA } });
+    const res = await fetch(url, { redirect: 'manual' }); // (a custom User-Agent makes Facebook answer 400)
     const loc = res.headers.get('location');
     if (!loc) break;
     url = new URL(loc, url).href;
@@ -113,15 +113,46 @@ async function fbGraphComments(id, cursor, env) {
   };
 }
 
+// ---------- Facebook via Bright Data (free tier ~5000 records/month; async snapshot polled by the browser) ----------
+const BD = 'https://api.brightdata.com/datasets/v3', BD_DATASET = 'gd_lkay758p1eanlolqw8';
+async function bdStart(url, env) { // returns snapshot id, or null when Bright Data can't take the job (no key / no credit / error)
+  if (!env.BRIGHTDATA_API_KEY) return null;
+  try {
+    const res = await fetch(`${BD}/trigger?dataset_id=${BD_DATASET}&format=json&include_errors=true`, {
+      method: 'POST', headers: { Authorization: `Bearer ${env.BRIGHTDATA_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify([{ url }]),
+    });
+    const j = JSON.parse(await res.text());
+    return j.snapshot_id || null;
+  } catch { return null; }
+}
+async function bdPoll(snapshot, url, env) {
+  const H = { headers: { Authorization: `Bearer ${env.BRIGHTDATA_API_KEY}` } };
+  const pr = await getJson(`${BD}/progress/${snapshot}`, H);
+  if (pr.status === 'failed') { // fall back to Apify
+    const r = await startFbRun(url, apifyTokens(env), 0, Number(env.FB_MAX_COMMENTS) || 6000);
+    if (r.run) return { comments: [], next: `${r.index}:${r.run.id}:${r.run.defaultDatasetId}`, progress: 0 };
+    throw new UserError('فشل جلب التعليقات من فيسبوك، جرّب مرة أخرى');
+  }
+  if (pr.status !== 'ready') return { comments: [], next: 'bd:' + snapshot, progress: -1 }; // -1 = running, size unknown
+  const rows = await getJson(`${BD}/snapshot/${snapshot}?format=json`, H);
+  if (!Array.isArray(rows)) return { comments: [], next: 'bd:' + snapshot, progress: -1 }; // not downloadable yet
+  return {
+    comments: rows.filter((x) => x.comment_text && !x.reply && !x.parent_comment_id).map((x) => ({
+      cid: x.comment_id, uid: x.user_id || x.user_url || x.user_name, name: x.user_name || 'مستخدم فيسبوك', text: x.comment_text, avatar: '', link: x.comment_link || '',
+    })),
+    next: null,
+  };
+}
+
 async function fbInfo(url, env) {
   if (env.FACEBOOK_ACCESS_TOKEN) {
     const g = await fbGraphInfo(url, env);
     if (g) return g;
-    if (!apifyTokens(env).length) throw new UserError('الفيديو ده مش على صفحتك أو التوكن ناقصه صلاحيات');
+    if (!apifyTokens(env).length && !env.BRIGHTDATA_API_KEY) throw new UserError('الفيديو ده مش على صفحتك أو التوكن ناقصه صلاحيات');
   }
-  if (!apifyTokens(env).length) throw new UserError('فيسبوك غير مفعّل. ضع FACEBOOK_ACCESS_TOKEN أو APIFY_TOKENS');
+  if (!apifyTokens(env).length && !env.BRIGHTDATA_API_KEY) throw new UserError('فيسبوك غير مفعّل. ضع BRIGHTDATA_API_KEY أو APIFY_TOKENS أو FACEBOOK_ACCESS_TOKEN');
   if (!/facebook\.com|fb\.watch|fb\.com/.test(url)) throw new UserError('رابط فيسبوك غير صحيح');
-  return { id: url, title: 'فيديو فيسبوك', author: '', owner: '', thumb: '', count: 0 };
+  return { id: await fbResolve(url).catch(() => url), title: 'فيديو فيسبوك', author: '', owner: '', thumb: '', count: 0 }; // short share links must be expanded for the scrapers
 }
 
 const mapFb = (items) => items.filter((c) => c.text && !(c.threadingDepth > 0)).map((c) => ({
@@ -143,9 +174,12 @@ async function startFbRun(url, tokens, from, max) {
   return { error: lastMsg };
 }
 async function fbComments(url, cursor, env) {
-  if (!/^https?:/.test(url)) return fbGraphComments(url, cursor, env); // numeric id => Graph API, URL => Apify
+  if (!/^https?:/.test(url)) return fbGraphComments(url, cursor, env); // numeric id => Graph API, URL => Bright Data / Apify
+  if (cursor && cursor.startsWith('bd:')) return bdPoll(cursor.slice(3), url, env);
   const tokens = apifyTokens(env), max = Number(env.FB_MAX_COMMENTS) || 6000; // safety cap on how many comments (= credit) one video may use
-  if (!cursor) { // first call: start the run with the first token that still has credit
+  if (!cursor) { // first call: Bright Data first, else start an Apify run with the first token that still has credit
+    const snap = await bdStart(url, env);
+    if (snap) return { comments: [], next: 'bd:' + snap, progress: -1 };
     const r = await startFbRun(url, tokens, 0, max);
     if (r.error !== undefined) throw new UserError(apifyMsg(r.error));
     return { comments: [], next: `${r.index}:${r.run.id}:${r.run.defaultDatasetId}`, progress: 0 };

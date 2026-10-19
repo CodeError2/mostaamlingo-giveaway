@@ -111,7 +111,7 @@ $('loadBtn').onclick = async () => {
     if (info.demo) { await sleep(700); comments = demoComments(); }
     else {
       let cursor = ''; const seenCids = new Set();
-      const onProgress = (n) => { $('progressText').textContent = `جاري التحميل... ${Math.max(n, comments.length)} تعليق`; }; // Facebook: total is unknown, show the running count
+      const onProgress = (n) => { $('progressText').textContent = n < 0 ? 'جاري التحميل...' : `جاري التحميل... ${Math.max(n, comments.length)} تعليق`; }; // Facebook: total is unknown, show the running count
       do {
         const d = await apiComments(platform, info.id, cursor, onProgress);
         for (const c of d.comments) { // Facebook may restart on the next token and re-send comments: skip ones we already have
