@@ -154,3 +154,10 @@ a.win:hover{border-color:var(--green);box-shadow:0 8px 26px #16a34a38}
 .vmedia img{object-fit:cover}
 .video>.vmedia img{width:100%}
 @media(max-width:560px){.vmedia{width:100%;max-width:none;aspect-ratio:9/14;max-height:70vh}}
+
+/* winner card: not clickable as a whole; only the buttons are */
+.wlinks{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.wbtn{display:inline-block;padding:7px 14px;border-radius:10px;background:var(--blue-l);color:var(--blue-d);font-weight:700;font-size:13px;text-decoration:none;cursor:pointer;transition:.15s}
+.wbtn:hover{background:var(--blue);color:#fff}
+
+.wdate{margin-top:4px;font-size:12px;color:var(--muted)}

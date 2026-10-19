@@ -254,8 +254,7 @@ function spinWheel(dur) {
 function renderResults(winners) {
   const list = $('winList'); list.innerHTML = '';
   winners.forEach((w, i) => {
-    const d = document.createElement(w.link ? 'a' : 'div'); d.className = 'win';
-    if (w.link) Object.assign(d, { href: w.link, target: '_blank', rel: 'noopener', title: 'افتح على المنصة' }); d.style.animationDelay = i * 0.25 + 's';
+    const d = document.createElement('div'); d.className = 'win'; d.style.animationDelay = i * 0.25 + 's';
     const av = w.avatar ? Object.assign(document.createElement('img'), { src: w.avatar, className: 'av', referrerPolicy: 'no-referrer' }) : null;
     d.innerHTML = `<div class="rank">${i + 1}</div>`;
     if (av) { av.onerror = () => av.remove(); d.appendChild(av); }
@@ -264,12 +263,12 @@ function renderResults(winners) {
     if (w.linkVideoOnly && w.uid) { const u = document.createElement('small'); u.className = 'wuser'; u.dir = 'ltr'; u.textContent = ' @' + w.uid; n.appendChild(u); } // TikTok: show @username to find the commenter
     const t = document.createElement('div'); t.className = 'wtext'; t.textContent = w.text;
     b.append(n, t);
-    if (w.profile && w.link) { // open the account itself: in the viewer's own (logged-in) Facebook it shows the current name
-      const pl = document.createElement('span'); pl.className = 'wlink wprof'; pl.textContent = 'فتح حسابه ↗'; pl.setAttribute('role', 'link');
-      pl.onclick = (e) => { e.preventDefault(); e.stopPropagation(); window.open(w.profile, '_blank', 'noopener'); };
-      b.appendChild(pl);
-    }
-    if (w.link) { const l = document.createElement('div'); l.className = 'wlink'; l.textContent = w.linkVideoOnly ? 'فتح الفيديو على تيك توك ↗' : `فتح التعليق على ${platform === 'youtube' ? 'يوتيوب' : 'فيسبوك'} ↗`; b.appendChild(l); }
+    if (w.date && !isNaN(new Date(w.date))) { const dt = document.createElement('div'); dt.className = 'wdate'; dt.textContent = 'كُتب: ' + new Date(w.date).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }); b.appendChild(dt); }
+    const links = document.createElement('div'); links.className = 'wlinks'; // only these buttons are clickable, not the whole card
+    const mk = (href, label) => Object.assign(document.createElement('a'), { className: 'wbtn', href, target: '_blank', rel: 'noopener', textContent: label });
+    if (w.link) links.appendChild(mk(w.link, w.linkVideoOnly ? 'فتح الفيديو على تيك توك ↗' : `فتح التعليق على ${platform === 'youtube' ? 'يوتيوب' : 'فيسبوك'} ↗`));
+    if (w.profile) links.appendChild(mk(w.profile, 'فتح حسابه ↗')); // in the viewer's own (logged-in) Facebook it shows the current name
+    if (links.children.length) b.appendChild(links);
     d.appendChild(b); list.appendChild(d);
   });
   $('fbNote').hidden = platform !== 'facebook';

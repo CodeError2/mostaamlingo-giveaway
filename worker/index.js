@@ -29,7 +29,7 @@ async function ytComments(id, cursor, env) {
   return {
     comments: (d.items || []).map((i) => {
       const s = i.snippet.topLevelComment.snippet;
-      return { uid: (s.authorChannelId && s.authorChannelId.value) || s.authorDisplayName, name: s.authorDisplayName, text: s.textDisplay, avatar: s.authorProfileImageUrl, link: `https://www.youtube.com/watch?v=${id}&lc=${i.id}` };
+      return { uid: (s.authorChannelId && s.authorChannelId.value) || s.authorDisplayName, name: s.authorDisplayName, text: s.textDisplay, date: s.publishedAt || '', avatar: s.authorProfileImageUrl, link: `https://www.youtube.com/watch?v=${id}&lc=${i.id}` };
     }),
     next: d.nextPageToken || null,
   };
@@ -56,6 +56,7 @@ async function ttComments(id, cursor) {
       uid: (c.user && (c.user.unique_id || c.user.id)) || '',
       name: (c.user && (c.user.nickname || c.user.unique_id)) || 'مستخدم',
       text: c.text && c.text.trim() ? c.text : '(ملصق / صورة)',
+      date: c.create_time ? new Date(c.create_time * 1000).toISOString() : '',
       avatar: c.user && c.user.avatar,
     })),
     next: d.hasMore ? String(d.cursor) : null,
@@ -150,7 +151,7 @@ async function bdPoll(snapshot, url, env) {
   if (!Array.isArray(rows)) return { comments: [], next: 'bd:' + snapshot, progress: -1 }; // not downloadable yet
   return {
     comments: rows.filter((x) => x.comment_text && !x.reply && !x.parent_comment_id).map((x) => ({
-      cid: x.comment_id, uid: x.user_id || x.user_url || x.user_name, name: x.user_name || 'مستخدم فيسبوك', text: x.comment_text,
+      cid: x.comment_id, uid: x.user_id || x.user_url || x.user_name, name: x.user_name || 'مستخدم فيسبوك', text: x.comment_text, date: x.date_created || '',
       avatar: x.commentator_profile_url || '', profile: x.user_url || x.commentator_profile || '', link: fbCommentLink(url, x), // (Bright Data's 'commentator_profile_url' is the picture)
     })),
     next: null,
@@ -193,7 +194,7 @@ async function fbInfo(url, env) {
 
 const mapFb = (items) => items.filter((c) => c.text && !(c.threadingDepth > 0)).map((c) => ({
   cid: c.commentId || c.id || c.commentUrl || '', // lets the browser drop duplicates when a second run re-scrapes the same comments
-  uid: c.profileId || c.profileUrl || c.profileName, name: c.profileName || 'مستخدم فيسبوك', text: c.text, avatar: c.profilePicture || '', profile: c.profileUrl || '', link: c.commentUrl || '',
+  uid: c.profileId || c.profileUrl || c.profileName, name: c.profileName || 'مستخدم فيسبوك', text: c.text, date: c.date || '', avatar: c.profilePicture || '', profile: c.profileUrl || '', link: c.commentUrl || '',
 }));
 // Start a run with the first token (from index `from`) that still has credit. Returns {index, run} or {error}.
 async function startFbRun(url, tokens, from, max) {

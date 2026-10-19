@@ -37,7 +37,7 @@ const Engine = (() => {
     return {
       comments: (d.items || []).map((i) => {
         const s = i.snippet.topLevelComment.snippet;
-        return { uid: (s.authorChannelId && s.authorChannelId.value) || s.authorDisplayName, name: s.authorDisplayName, text: s.textDisplay, avatar: s.authorProfileImageUrl, link: `https://www.youtube.com/watch?v=${id}&lc=${i.id}` };
+        return { uid: (s.authorChannelId && s.authorChannelId.value) || s.authorDisplayName, name: s.authorDisplayName, text: s.textDisplay, date: s.publishedAt || '', avatar: s.authorProfileImageUrl, link: `https://www.youtube.com/watch?v=${id}&lc=${i.id}` };
       }),
       next: d.nextPageToken || null,
     };
@@ -64,6 +64,7 @@ const Engine = (() => {
         uid: (c.user && (c.user.unique_id || c.user.id)) || '',
         name: (c.user && (c.user.nickname || c.user.unique_id)) || 'مستخدم',
         text: c.text && c.text.trim() ? c.text : '(ملصق / صورة)',
+        date: c.create_time ? new Date(c.create_time * 1000).toISOString() : '',
         avatar: c.user && c.user.avatar,
       })),
       next: d.hasMore ? String(d.cursor) : null,
