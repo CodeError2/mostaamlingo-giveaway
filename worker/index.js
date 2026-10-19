@@ -148,6 +148,18 @@ async function bdPoll(snapshot, url, env) {
   };
 }
 
+// Title / thumbnail / page name from the video's public Open Graph tags (what Facebook shows when a link is shared)
+const decodeHtml = (t) => t.replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d)).replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+async function fbMeta(url) {
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': BROWSER_UA }, signal: AbortSignal.timeout(8000) });
+    const html = (await res.text()).slice(0, 400000);
+    const og = (p) => { const m = html.match(new RegExp(`<meta[^>]+(?:property|name)="${p}"[^>]*content="([^"]*)"`, 'i')); return m ? decodeHtml(m[1]) : ''; };
+    const parts = og('og:title').split('|').map((x) => x.replace(/[‎‏]/g, '').trim()).filter(Boolean);
+    return { title: (og('og:description') || parts[1] || '').slice(0, 200), author: parts.length > 1 ? parts[parts.length - 1] : '', thumb: og('og:image') };
+  } catch { return {}; }
+}
+
 async function fbInfo(url, env) {
   if (env.FACEBOOK_ACCESS_TOKEN) {
     const g = await fbGraphInfo(url, env);
@@ -156,7 +168,11 @@ async function fbInfo(url, env) {
   }
   if (!apifyTokens(env).length && !env.BRIGHTDATA_API_KEY) throw new UserError('فيسبوك غير مفعّل. ضع BRIGHTDATA_API_KEY أو APIFY_TOKENS أو FACEBOOK_ACCESS_TOKEN');
   if (!/facebook\.com|fb\.watch|fb\.com/.test(url)) throw new UserError('رابط فيسبوك غير صحيح');
-  return { id: await fbResolve(url).catch(() => url), title: 'فيديو فيسبوك', author: '', owner: '', thumb: '', count: 0 }; // short share links must be expanded for the scrapers
+  let id = url; // short share links must be expanded for the scrapers; Facebook sometimes answers without redirecting, so retry
+  for (let i = 0; i < 3; i++) { id = await fbResolve(url).catch(() => url); if (!/facebook\.com\/share\/|fb\.watch/.test(id)) break; await sleep(400); }
+  let meta = await fbMeta(id);
+  if (!meta.title && !meta.thumb) meta = await fbMeta(id);
+  return { id, title: meta.title || 'فيديو فيسبوك', author: meta.author || '', owner: '', thumb: meta.thumb || '', count: 0 };
 }
 
 const mapFb = (items) => items.filter((c) => c.text && !(c.threadingDepth > 0)).map((c) => ({

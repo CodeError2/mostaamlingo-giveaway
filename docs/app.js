@@ -46,6 +46,8 @@ function go(s) { // record a new step in browser history (replace if unchanged)
   save();
 }
 function fillVideo() {
+  $('vThumb').referrerPolicy = 'no-referrer'; // Facebook's image CDN refuses some referrers
+  $('vThumb').onerror = () => { $('vThumb').onerror = null; $('vThumb').src = 'logo.png'; };
   $('vThumb').src = info.thumb || 'logo.png';
   $('vTitle').textContent = info.title;
   $('vAuthor').textContent = (info.author ? info.author + ' · ' : '') + (info.count ? info.count + ' تعليق' : '');
