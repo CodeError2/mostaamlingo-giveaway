@@ -129,6 +129,14 @@ async function bdStart(url, env) { // returns snapshot id, or null when Bright D
     return j.snapshot_id || null;
   } catch { return null; }
 }
+// Link that opens the comment itself. Bright Data's own link is /video.php?v=..&comment_id=.. which lands on the video only;
+// for reels Facebook's comment permalink is /reel/<video id>/?comment_id=<id> (the same format Apify returns).
+function fbCommentLink(videoUrl, row) {
+  const cid = (String(row.comment_link || '').match(/[?&]comment_id=(\d+)/) || [])[1];
+  const vid = (videoUrl.match(/\/reel\/(\d+)/) || String(row.comment_link || '').match(/[?&]v=(\d+)/) || [])[1];
+  if (cid && vid) return `https://www.facebook.com/reel/${vid}/?comment_id=${cid}`;
+  return row.comment_link || '';
+}
 async function bdPoll(snapshot, url, env) {
   const H = { headers: { Authorization: `Bearer ${env.BRIGHTDATA_API_KEY}` } };
   const pr = await getJson(`${BD}/progress/${snapshot}`, H);
@@ -143,7 +151,7 @@ async function bdPoll(snapshot, url, env) {
   return {
     comments: rows.filter((x) => x.comment_text && !x.reply && !x.parent_comment_id).map((x) => ({
       cid: x.comment_id, uid: x.user_id || x.user_url || x.user_name, name: x.user_name || 'مستخدم فيسبوك', text: x.comment_text,
-      avatar: x.commentator_profile_url || '', profile: x.user_url || x.commentator_profile || '', link: x.comment_link || '', // (Bright Data's 'commentator_profile_url' is the picture)
+      avatar: x.commentator_profile_url || '', profile: x.user_url || x.commentator_profile || '', link: fbCommentLink(url, x), // (Bright Data's 'commentator_profile_url' is the picture)
     })),
     next: null,
   };
