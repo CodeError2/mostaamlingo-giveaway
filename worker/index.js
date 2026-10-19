@@ -69,11 +69,61 @@ const apifyMsg = (m) => /limit|usage|credit|billing/i.test(m || '')
 const APIFY = 'https://api.apify.com/v2';
 const apifyTokens = (env) => (env.APIFY_TOKENS || env.APIFY_TOKEN || '').split(',').map((t) => t.trim()).filter(Boolean);
 const isQuotaError = (m) => /limit|usage|credit|billing/i.test(m || '');
+// ---------- Facebook Graph API (free, unlimited; works for videos/posts on the page the token belongs to) ----------
+const GRAPH = 'https://graph.facebook.com/v19.0';
+async function fbResolve(url) { // share links (/share/v/..., fb.watch) redirect to the real URL
+  const short = (u) => /facebook\.com\/share\/|fb\.watch/.test(u);
+  if (!short(url)) return url;
+  for (let i = 0; i < 4; i++) {
+    const res = await fetch(url, { redirect: 'manual', headers: { 'User-Agent': UA } });
+    const loc = res.headers.get('location');
+    if (!loc) break;
+    url = new URL(loc, url).href;
+    if (!short(url)) break;
+  }
+  return url;
+}
+function fbObjectId(url, env) {
+  let m = url.match(/(?:reel\/|videos\/|v=)(\d+)/);
+  if (m) return m[1];
+  m = url.match(/facebook\.com\/(\d+)\/posts\/(\d+)/);
+  if (m) return `${m[1]}_${m[2]}`;
+  m = url.match(/story_fbid=(\d+)/);
+  const pid = (url.match(/[?&]id=(\d+)/) || [])[1] || env.FACEBOOK_PAGE_ID;
+  if (m && pid) return `${pid}_${m[1]}`;
+  m = url.match(/posts\/([A-Za-z0-9]+)/);
+  if (m && env.FACEBOOK_PAGE_ID) return `${env.FACEBOOK_PAGE_ID}_${m[1]}`;
+  return null;
+}
+async function fbGraphInfo(url, env) { // returns info, or null if Graph can't see this object (not on our page / bad token)
+  const id = fbObjectId(await fbResolve(url), env), tok = encodeURIComponent(env.FACEBOOK_ACCESS_TOKEN);
+  if (!id) return null;
+  let d = await getJson(`${GRAPH}/${id}?fields=description,picture,from&access_token=${tok}`);
+  if (d.error) d = await getJson(`${GRAPH}/${id}?fields=message,full_picture,from&access_token=${tok}`);
+  if (d.error) { if (d.error.code === 190) throw new UserError('توكن فيسبوك انتهى. اعمل توكن جديد.'); return null; }
+  const c = await getJson(`${GRAPH}/${id}/comments?summary=true&limit=0&filter=toplevel&access_token=${tok}`);
+  return { id, title: (d.description || d.message || 'فيديو فيسبوك').slice(0, 140), author: d.from && d.from.name, owner: d.from && d.from.id, thumb: d.picture || d.full_picture || '', count: (c.summary && c.summary.total_count) || 0 };
+}
+async function fbGraphComments(id, cursor, env) {
+  const d = await getJson(`${GRAPH}/${id}/comments?filter=toplevel&limit=100&fields=id,from,message,permalink_url&access_token=${encodeURIComponent(env.FACEBOOK_ACCESS_TOKEN)}` + (cursor ? `&after=${encodeURIComponent(cursor)}` : ''));
+  if (d.error) throw new UserError(d.error.code === 190 ? 'توكن فيسبوك انتهى. اعمل توكن جديد.' : 'Facebook: ' + d.error.message);
+  return {
+    comments: (d.data || []).filter((c) => c.message).map((c) => ({ cid: c.id, uid: (c.from && c.from.id) || c.id, name: (c.from && c.from.name) || 'مستخدم فيسبوك', text: c.message, avatar: '', link: c.permalink_url || '' })),
+    next: d.paging && d.paging.next ? d.paging.cursors.after : null,
+  };
+}
+
 async function fbInfo(url, env) {
-  if (!apifyTokens(env).length) throw new UserError('توكن Apify غير مضبوط');
+  if (env.FACEBOOK_ACCESS_TOKEN) {
+    const g = await fbGraphInfo(url, env);
+    if (g) return g;
+    if (!apifyTokens(env).length) throw new UserError('الفيديو ده مش على صفحتك أو التوكن ناقصه صلاحيات');
+  }
+  if (!apifyTokens(env).length) throw new UserError('فيسبوك غير مفعّل. ضع FACEBOOK_ACCESS_TOKEN أو APIFY_TOKENS');
   if (!/facebook\.com|fb\.watch|fb\.com/.test(url)) throw new UserError('رابط فيسبوك غير صحيح');
   return { id: url, title: 'فيديو فيسبوك', author: '', owner: '', thumb: '', count: 0 };
 }
+
 const mapFb = (items) => items.filter((c) => c.text && !(c.threadingDepth > 0)).map((c) => ({
   cid: c.commentId || c.id || c.commentUrl || '', // lets the browser drop duplicates when a second run re-scrapes the same comments
   uid: c.profileId || c.profileUrl || c.profileName, name: c.profileName || 'مستخدم فيسبوك', text: c.text, avatar: c.profilePicture || '', link: c.commentUrl || '',
@@ -93,6 +143,7 @@ async function startFbRun(url, tokens, from, max) {
   return { error: lastMsg };
 }
 async function fbComments(url, cursor, env) {
+  if (!/^https?:/.test(url)) return fbGraphComments(url, cursor, env); // numeric id => Graph API, URL => Apify
   const tokens = apifyTokens(env), max = Number(env.FB_MAX_COMMENTS) || 6000; // safety cap on how many comments (= credit) one video may use
   if (!cursor) { // first call: start the run with the first token that still has credit
     const r = await startFbRun(url, tokens, 0, max);
