@@ -45,10 +45,24 @@ function go(s) { // record a new step in browser history (replace if unchanged)
   if (history.state && history.state.step === s) history.replaceState({ step: s }, ''); else history.pushState({ step: s }, '');
   save();
 }
+function embedUrl() {
+  if (!info || info.demo) return '';
+  if (platform === 'youtube') return `https://www.youtube.com/embed/${info.id}?rel=0`;
+  if (platform === 'tiktok') return `https://www.tiktok.com/embed/v2/${info.id}`;
+  if (platform === 'facebook') {
+    const reel = String(info.id).match(/facebook\.com\/reel\/(\d+)/);
+    const href = reel ? `https://www.facebook.com/reel/${reel[1]}/` : String(info.id).split('?')[0]; // drop tracking params
+    return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=false&t=0`;
+  }
+  return '';
+}
 function fillVideo() {
   $('vThumb').referrerPolicy = 'no-referrer'; // Facebook's image CDN refuses some referrers
   $('vThumb').onerror = () => { $('vThumb').onerror = null; $('vThumb').src = 'logo.png'; };
   $('vThumb').src = info.thumb || 'logo.png';
+  // the real video player (so the preview never depends on thumbnail/title scraping)
+  const fr = $('vFrame'), embed = embedUrl();
+  if (embed) { if (fr.dataset.src !== embed) { fr.src = embed; fr.dataset.src = embed; } fr.hidden = false; } else { fr.removeAttribute('src'); fr.dataset.src = ''; fr.hidden = true; }
   $('vTitle').textContent = info.title;
   $('vAuthor').textContent = (info.author ? info.author + ' · ' : '') + (info.count ? info.count + ' تعليق' : '');
   $('loadBtn').disabled = false; $('loadBtn').textContent = comments.length ? 'إعادة تحميل التعليقات' : 'تحميل التعليقات';
