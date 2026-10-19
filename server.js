@@ -144,7 +144,7 @@ async function fbApifyInfo(url) {
 async function fbApifyComments(url) {
   const res = await fetch(
     `https://api.apify.com/v2/acts/apify~facebook-comments-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=280`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startUrls: [{ url }], resultsLimit: 1000, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }) }
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startUrls: [{ url }], resultsLimit: 6000, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }) }
   );
   const d = await res.json().catch(() => null);
   if (!Array.isArray(d)) throw new UserError('Apify: ' + ((d && d.error && d.error.message) || 'تعذر جلب التعليقات (تأكد من التوكن والرصيد)'));

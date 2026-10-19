@@ -85,7 +85,7 @@ const Engine = (() => {
     // start the run asynchronously so we can report progress while it scrapes
     const run = await getJson(`${api}/acts/apify~facebook-comments-scraper/runs?token=${token}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ startUrls: [{ url }], resultsLimit: 1000, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }),
+      body: JSON.stringify({ startUrls: [{ url }], resultsLimit: 6000, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }),
     });
     if (!run.data) throw new UserError(apifyMsg(run.error && run.error.message));
     const runId = run.data.id, ds = run.data.defaultDatasetId, t0 = Date.now();
