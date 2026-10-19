@@ -180,8 +180,14 @@ async function fbInfo(url, env) {
   url = url.trim().replace(/^(https?:\/\/)(?:m|web|mbasic|touch|mobile)\.facebook\.com/i, '$1www.facebook.com'); // mobile links get a cookie-consent page instead of the video
   let id = url; // short share links must be expanded for the scrapers; Facebook sometimes answers without redirecting, so retry
   for (let i = 0; i < 3; i++) { id = await fbResolve(url).catch(() => url); if (!/facebook\.com\/share\/|fb\.watch/.test(id)) break; await sleep(400); }
-  let meta = await fbMeta(id);
-  for (let i = 0; i < 3 && !meta.title && !meta.thumb; i++) { await sleep(300); meta = await fbMeta(id); } // Facebook answers empty now and then
+  // Title/thumbnail: try the link as given, then other URL forms of the same video (some forms, e.g. video.php, give no preview data)
+  const vid = (id.match(/\/reel\/(\d+)/) || id.match(/[?&]v=(\d+)/) || id.match(/\/videos\/(\d+)/) || [])[1];
+  const tries = [id, ...(vid ? [`https://www.facebook.com/reel/${vid}/`, `https://www.facebook.com/watch/?v=${vid}`] : [])];
+  let meta = {};
+  for (let round = 0; round < 3 && !meta.title && !meta.thumb; round++) {
+    for (const t of tries) { meta = await fbMeta(t); if (meta.title || meta.thumb) break; }
+    if (!meta.title && !meta.thumb) await sleep(300); // Facebook answers empty now and then
+  }
   return { id, title: meta.title || 'فيديو فيسبوك', author: meta.author || '', owner: '', thumb: meta.thumb || '', count: 0 };
 }
 
