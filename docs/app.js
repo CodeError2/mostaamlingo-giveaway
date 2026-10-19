@@ -105,15 +105,20 @@ $('searchForm').onsubmit = async (e) => {
 $('loadBtn').onclick = async () => {
   $('loadBtn').disabled = true; $('setupCard').hidden = true; showError('');
   $('progress').hidden = false; $('progressText').textContent = 'جاري التحميل... 0';
+  let warning = '';
   comments = []; lastWinners = null;
   try {
     if (info.demo) { await sleep(700); comments = demoComments(); }
     else {
-      let cursor = '';
-      const onProgress = (n) => { $('progressText').textContent = `جاري التحميل... ${n} تعليق`; }; // Facebook: total is unknown, show the running count
+      let cursor = ''; const seenCids = new Set();
+      const onProgress = (n) => { $('progressText').textContent = `جاري التحميل... ${Math.max(n, comments.length)} تعليق`; }; // Facebook: total is unknown, show the running count
       do {
         const d = await apiComments(platform, info.id, cursor, onProgress);
-        comments.push(...d.comments);
+        for (const c of d.comments) { // Facebook may restart on the next token and re-send comments: skip ones we already have
+          if (c.cid) { if (seenCids.has(c.cid)) continue; seenCids.add(c.cid); }
+          comments.push(c);
+        }
+        if (d.warning) warning = d.warning;
         cursor = d.next || '';
         if (d.progress !== undefined && cursor) { onProgress(d.progress); await sleep(2000); continue; } // Facebook via server: poll the run
         const pct = info.count ? Math.min(99, Math.round((comments.length / info.count) * 100)) : 0;
@@ -125,6 +130,7 @@ $('loadBtn').onclick = async () => {
     comments = comments.filter((c) => c.text && c.text.trim() && !(info.owner && String(c.uid) === String(info.owner)) && !/مستعملينجو/.test(c.name || ''));
     if (!comments.length) return showError('لا توجد تعليقات على هذا الفيديو');
     updateSetup(); $('setupCard').hidden = false; go('setup');
+    if (warning) showError(warning);
     $('setupCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (err) {
     $('progress').hidden = true; $('loadBtn').disabled = false; showError(err.message);

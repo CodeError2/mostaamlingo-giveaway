@@ -74,33 +74,53 @@ async function fbInfo(url, env) {
   if (!/facebook\.com|fb\.watch|fb\.com/.test(url)) throw new UserError('رابط فيسبوك غير صحيح');
   return { id: url, title: 'فيديو فيسبوك', author: '', owner: '', thumb: '', count: 0 };
 }
+const mapFb = (items) => items.filter((c) => c.text && !(c.threadingDepth > 0)).map((c) => ({
+  cid: c.commentId || c.id || c.commentUrl || '', // lets the browser drop duplicates when a second run re-scrapes the same comments
+  uid: c.profileId || c.profileUrl || c.profileName, name: c.profileName || 'مستخدم فيسبوك', text: c.text, avatar: c.profilePicture || '', link: c.commentUrl || '',
+}));
+// Start a run with the first token (from index `from`) that still has credit. Returns {index, run} or {error}.
+async function startFbRun(url, tokens, from) {
+  let lastMsg = '';
+  for (let i = from; i < tokens.length; i++) {
+    const run = await getJson(`${APIFY}/acts/apify~facebook-comments-scraper/runs?token=${encodeURIComponent(tokens[i])}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ startUrls: [{ url }], resultsLimit: 1000, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }),
+    });
+    if (run.data) return { index: i, run: run.data };
+    lastMsg = run.error && run.error.message;
+    if (!isQuotaError(lastMsg)) break; // real error (bad link/token): don't burn through the other accounts
+  }
+  return { error: lastMsg };
+}
 async function fbComments(url, cursor, env) {
   const tokens = apifyTokens(env);
   if (!cursor) { // first call: start the run with the first token that still has credit
-    let lastMsg = '';
-    for (let i = 0; i < tokens.length; i++) {
-      const run = await getJson(`${APIFY}/acts/apify~facebook-comments-scraper/runs?token=${encodeURIComponent(tokens[i])}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startUrls: [{ url }], resultsLimit: 1000, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }),
-      });
-      if (run.data) return { comments: [], next: `${i}:${run.data.id}:${run.data.defaultDatasetId}`, progress: 0 };
-      lastMsg = run.error && run.error.message;
-      if (!isQuotaError(lastMsg)) break; // real error (bad link/token): don't burn through the other accounts
-    }
-    throw new UserError(apifyMsg(lastMsg));
+    const r = await startFbRun(url, tokens, 0);
+    if (r.error !== undefined) throw new UserError(apifyMsg(r.error));
+    return { comments: [], next: `${r.index}:${r.run.id}:${r.run.defaultDatasetId}`, progress: 0 };
   }
   const [idx, runId, ds] = cursor.split(':');
   const token = encodeURIComponent(tokens[Number(idx)] || tokens[0]);
   const [st, d] = await Promise.all([getJson(`${APIFY}/actor-runs/${runId}?token=${token}`), getJson(`${APIFY}/datasets/${ds}?token=${token}`)]);
   const status = st.data && st.data.status;
-  if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(status)) throw new UserError('Apify: فشل الجلب (' + status + ')، تأكد من الرابط والرصيد');
-  if (status !== 'SUCCEEDED') return { comments: [], next: cursor, progress: (d.data && d.data.itemCount) || 0 };
-  const items = await getJson(`${APIFY}/datasets/${ds}/items?token=${token}&clean=1`);
-  if (!Array.isArray(items)) throw new UserError('Apify: تعذر قراءة النتائج');
-  return {
-    comments: items.filter((c) => c.text && !(c.threadingDepth > 0)).map((c) => ({ uid: c.profileId || c.profileUrl || c.profileName, name: c.profileName || 'مستخدم فيسبوك', text: c.text, avatar: c.profilePicture || '', link: c.commentUrl || '' })),
-    next: null,
-  };
+  if (status === 'SUCCEEDED') {
+    const items = await getJson(`${APIFY}/datasets/${ds}/items?token=${token}&clean=1`);
+    if (!Array.isArray(items)) throw new UserError('Apify: تعذر قراءة النتائج');
+    return { comments: mapFb(items), next: null };
+  }
+  if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(status)) {
+    // The run died (typically this account ran out of credit mid-way). Keep what it already collected,
+    // then continue on the next token. Apify can't resume, so the next run re-scrapes; the browser drops duplicates.
+    const raw = await getJson(`${APIFY}/datasets/${ds}/items?token=${token}&clean=1`);
+    const partial = Array.isArray(raw) ? mapFb(raw) : [];
+    const quotaLike = partial.length > 0 || status === 'ABORTED' || isQuotaError(st.data && st.data.statusMessage);
+    if (!quotaLike) throw new UserError('Apify: فشل الجلب (' + status + ')، تأكد من الرابط والرصيد');
+    const r = await startFbRun(url, tokens, Number(idx) + 1);
+    if (r.run) return { comments: partial, next: `${r.index}:${r.run.id}:${r.run.defaultDatasetId}`, progress: 0 };
+    if (partial.length) return { comments: partial, next: null, warning: `الرصيد خلص في كل الحسابات، فاتجمع ${partial.length} تعليق بس من الفيديو.` };
+    throw new UserError(apifyMsg(r.error));
+  }
+  return { comments: [], next: cursor, progress: (d.data && d.data.itemCount) || 0 };
 }
 
 const providers = { youtube: { info: ytInfo, comments: ytComments }, tiktok: { info: ttInfo, comments: ttComments }, facebook: { info: fbInfo, comments: fbComments } };
