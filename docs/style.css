@@ -142,3 +142,6 @@ a.win:hover{border-color:var(--green);box-shadow:0 8px 26px #16a34a38}
 }
 
 .fbnote{max-width:640px;margin:-8px auto 14px;text-align:center;font-size:13px;color:var(--muted)}
+
+.wprof{display:inline-block;margin-inline-end:12px;cursor:pointer;color:var(--blue);text-decoration:underline}
+.wbody .wlink{display:inline-block}

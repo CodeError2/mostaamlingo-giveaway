@@ -246,6 +246,11 @@ function renderResults(winners) {
     if (w.linkVideoOnly && w.uid) { const u = document.createElement('small'); u.className = 'wuser'; u.dir = 'ltr'; u.textContent = ' @' + w.uid; n.appendChild(u); } // TikTok: show @username to find the commenter
     const t = document.createElement('div'); t.className = 'wtext'; t.textContent = w.text;
     b.append(n, t);
+    if (w.profile && w.link) { // open the account itself: in the viewer's own (logged-in) Facebook it shows the current name
+      const pl = document.createElement('span'); pl.className = 'wlink wprof'; pl.textContent = 'فتح حسابه ↗'; pl.setAttribute('role', 'link');
+      pl.onclick = (e) => { e.preventDefault(); e.stopPropagation(); window.open(w.profile, '_blank', 'noopener'); };
+      b.appendChild(pl);
+    }
     if (w.link) { const l = document.createElement('div'); l.className = 'wlink'; l.textContent = w.linkVideoOnly ? 'فتح الفيديو على تيك توك ↗' : `فتح التعليق على ${platform === 'youtube' ? 'يوتيوب' : 'فيسبوك'} ↗`; b.appendChild(l); }
     d.appendChild(b); list.appendChild(d);
   });
