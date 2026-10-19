@@ -79,12 +79,12 @@ const mapFb = (items) => items.filter((c) => c.text && !(c.threadingDepth > 0)).
   uid: c.profileId || c.profileUrl || c.profileName, name: c.profileName || 'مستخدم فيسبوك', text: c.text, avatar: c.profilePicture || '', link: c.commentUrl || '',
 }));
 // Start a run with the first token (from index `from`) that still has credit. Returns {index, run} or {error}.
-async function startFbRun(url, tokens, from) {
+async function startFbRun(url, tokens, from, max) {
   let lastMsg = '';
   for (let i = from; i < tokens.length; i++) {
     const run = await getJson(`${APIFY}/acts/apify~facebook-comments-scraper/runs?token=${encodeURIComponent(tokens[i])}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ startUrls: [{ url }], resultsLimit: 1000, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }),
+      body: JSON.stringify({ startUrls: [{ url }], resultsLimit: max, includeNestedComments: false, viewOption: 'RANKED_UNFILTERED' }),
     });
     if (run.data) return { index: i, run: run.data };
     lastMsg = run.error && run.error.message;
@@ -93,9 +93,9 @@ async function startFbRun(url, tokens, from) {
   return { error: lastMsg };
 }
 async function fbComments(url, cursor, env) {
-  const tokens = apifyTokens(env);
+  const tokens = apifyTokens(env), max = Number(env.FB_MAX_COMMENTS) || 6000; // safety cap on how many comments (= credit) one video may use
   if (!cursor) { // first call: start the run with the first token that still has credit
-    const r = await startFbRun(url, tokens, 0);
+    const r = await startFbRun(url, tokens, 0, max);
     if (r.error !== undefined) throw new UserError(apifyMsg(r.error));
     return { comments: [], next: `${r.index}:${r.run.id}:${r.run.defaultDatasetId}`, progress: 0 };
   }
@@ -115,7 +115,7 @@ async function fbComments(url, cursor, env) {
     const partial = Array.isArray(raw) ? mapFb(raw) : [];
     const quotaLike = partial.length > 0 || status === 'ABORTED' || isQuotaError(st.data && st.data.statusMessage);
     if (!quotaLike) throw new UserError('Apify: فشل الجلب (' + status + ')، تأكد من الرابط والرصيد');
-    const r = await startFbRun(url, tokens, Number(idx) + 1);
+    const r = await startFbRun(url, tokens, Number(idx) + 1, max);
     if (r.run) return { comments: partial, next: `${r.index}:${r.run.id}:${r.run.defaultDatasetId}`, progress: 0 };
     if (partial.length) return { comments: partial, next: null, warning: `الرصيد خلص في كل الحسابات، فاتجمع ${partial.length} تعليق بس من الفيديو.` };
     throw new UserError(apifyMsg(r.error));
