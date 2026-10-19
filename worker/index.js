@@ -177,10 +177,11 @@ async function fbInfo(url, env) {
   }
   if (!apifyTokens(env).length && !env.BRIGHTDATA_API_KEY) throw new UserError('فيسبوك غير مفعّل. ضع BRIGHTDATA_API_KEY أو APIFY_TOKENS أو FACEBOOK_ACCESS_TOKEN');
   if (!/facebook\.com|fb\.watch|fb\.com/.test(url)) throw new UserError('رابط فيسبوك غير صحيح');
+  url = url.trim().replace(/^(https?:\/\/)(?:m|web|mbasic|touch|mobile)\.facebook\.com/i, '$1www.facebook.com'); // mobile links get a cookie-consent page instead of the video
   let id = url; // short share links must be expanded for the scrapers; Facebook sometimes answers without redirecting, so retry
   for (let i = 0; i < 3; i++) { id = await fbResolve(url).catch(() => url); if (!/facebook\.com\/share\/|fb\.watch/.test(id)) break; await sleep(400); }
   let meta = await fbMeta(id);
-  if (!meta.title && !meta.thumb) meta = await fbMeta(id);
+  for (let i = 0; i < 3 && !meta.title && !meta.thumb; i++) { await sleep(300); meta = await fbMeta(id); } // Facebook answers empty now and then
   return { id, title: meta.title || 'فيديو فيسبوك', author: meta.author || '', owner: '', thumb: meta.thumb || '', count: 0 };
 }
 
