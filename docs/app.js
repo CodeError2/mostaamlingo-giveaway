@@ -267,6 +267,7 @@ function renderResults(winners) {
     const links = document.createElement('div'); links.className = 'wlinks'; // only these buttons are clickable, not the whole card
     const mk = (href, label) => Object.assign(document.createElement('a'), { className: 'wbtn', href, target: '_blank', rel: 'noopener', textContent: label });
     if (w.link) links.appendChild(mk(w.link, w.linkVideoOnly ? 'فتح الفيديو على تيك توك ↗' : `فتح التعليق على ${platform === 'youtube' ? 'يوتيوب' : 'فيسبوك'} ↗`));
+    if (platform === 'facebook' && w.link) links.appendChild(mk(w.link.replace('//www.facebook.com', '//web.facebook.com'), 'فتح التعليق في المتصفح ↗')); // web.* host: Android may not hand it to the app
     if (w.profile) links.appendChild(mk(w.profile, 'فتح حسابه ↗')); // in the viewer's own (logged-in) Facebook it shows the current name
     if (links.children.length) b.appendChild(links);
     d.appendChild(b); list.appendChild(d);
