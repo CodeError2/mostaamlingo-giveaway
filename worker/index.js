@@ -142,7 +142,8 @@ async function bdPoll(snapshot, url, env) {
   if (!Array.isArray(rows)) return { comments: [], next: 'bd:' + snapshot, progress: -1 }; // not downloadable yet
   return {
     comments: rows.filter((x) => x.comment_text && !x.reply && !x.parent_comment_id).map((x) => ({
-      cid: x.comment_id, uid: x.user_id || x.user_url || x.user_name, name: x.user_name || 'مستخدم فيسبوك', text: x.comment_text, avatar: '', link: x.comment_link || '',
+      cid: x.comment_id, uid: x.user_id || x.user_url || x.user_name, name: x.user_name || 'مستخدم فيسبوك', text: x.comment_text,
+      avatar: x.commentator_profile_url || '', profile: x.user_url || x.commentator_profile || '', link: x.comment_link || '', // (Bright Data's 'commentator_profile_url' is the picture)
     })),
     next: null,
   };
@@ -177,7 +178,7 @@ async function fbInfo(url, env) {
 
 const mapFb = (items) => items.filter((c) => c.text && !(c.threadingDepth > 0)).map((c) => ({
   cid: c.commentId || c.id || c.commentUrl || '', // lets the browser drop duplicates when a second run re-scrapes the same comments
-  uid: c.profileId || c.profileUrl || c.profileName, name: c.profileName || 'مستخدم فيسبوك', text: c.text, avatar: c.profilePicture || '', link: c.commentUrl || '',
+  uid: c.profileId || c.profileUrl || c.profileName, name: c.profileName || 'مستخدم فيسبوك', text: c.text, avatar: c.profilePicture || '', profile: c.profileUrl || '', link: c.commentUrl || '',
 }));
 // Start a run with the first token (from index `from`) that still has credit. Returns {index, run} or {error}.
 async function startFbRun(url, tokens, from, max) {

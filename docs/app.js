@@ -249,6 +249,7 @@ function renderResults(winners) {
     if (w.link) { const l = document.createElement('div'); l.className = 'wlink'; l.textContent = w.linkVideoOnly ? 'فتح الفيديو على تيك توك ↗' : `فتح التعليق على ${platform === 'youtube' ? 'يوتيوب' : 'فيسبوك'} ↗`; b.appendChild(l); }
     d.appendChild(b); list.appendChild(d);
   });
+  $('fbNote').hidden = platform !== 'facebook';
   $('results').hidden = false; $('results').scrollTop = 0;
 }
 $('close').onclick = () => history.back();

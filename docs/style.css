@@ -140,3 +140,5 @@ a.win:hover{border-color:var(--green);box-shadow:0 8px 26px #16a34a38}
   .gear{left:8px;width:36px;height:36px;font-size:18px}
   .ovHead{padding:0 12px}.ovHead img{height:52px}.ovHead span{font-size:21px;white-space:nowrap}
 }
+
+.fbnote{max-width:640px;margin:-8px auto 14px;text-align:center;font-size:13px;color:var(--muted)}
