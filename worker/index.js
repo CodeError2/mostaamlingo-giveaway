@@ -71,14 +71,18 @@ const apifyTokens = (env) => (env.APIFY_TOKENS || env.APIFY_TOKEN || '').split('
 const isQuotaError = (m) => /limit|usage|credit|billing/i.test(m || '');
 // ---------- Facebook Graph API (free, unlimited; works for videos/posts on the page the token belongs to) ----------
 const GRAPH = 'https://graph.facebook.com/v19.0';
+const BROWSER_UA = 'facebookexternalhit/1.1'; // full Chrome-style UAs get HTTP 400 here; this one gets the normal redirect
 async function fbResolve(url) { // share links (/share/v/..., fb.watch) redirect to the real URL
+  const orig = url;
   const short = (u) => /facebook\.com\/share\/|fb\.watch/.test(u);
   if (!short(url)) return url;
   for (let i = 0; i < 4; i++) {
-    const res = await fetch(url, { redirect: 'manual' }); // (a custom User-Agent makes Facebook answer 400)
+    const res = await fetch(url, { redirect: 'manual', headers: { 'User-Agent': BROWSER_UA } }); // without a UA (Workers send none) Facebook redirects to /unsupportedbrowser
     const loc = res.headers.get('location');
     if (!loc) break;
-    url = new URL(loc, url).href;
+    const next = new URL(loc, url).href;
+    if (/unsupportedbrowser|\/login|checkpoint/.test(next)) return orig; // bad redirect: keep the link as given
+    url = next;
     if (!short(url)) break;
   }
   return url;
