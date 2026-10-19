@@ -145,3 +145,5 @@ a.win:hover{border-color:var(--green);box-shadow:0 8px 26px #16a34a38}
 
 .wprof{display:inline-block;margin-inline-end:12px;cursor:pointer;color:var(--blue);text-decoration:underline}
 .wbody .wlink{display:inline-block}
+
+.wonnote{text-align:center;font-size:13px;color:var(--muted);margin-bottom:12px}.wonnote a{color:var(--blue);cursor:pointer;text-decoration:underline}

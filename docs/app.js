@@ -36,9 +36,9 @@ const demoComments = () => Array.from({ length: 120 }, (_, i) => ({
 
 // ---------- state: survives refresh + works with browser Back ----------
 const KEY = 'giveaway_state_v1', ORDER = ['search', 'video', 'setup', 'results'];
-let step = 'search', lastWinners = null, showToken = 0;
+let step = 'search', lastWinners = null, showToken = 0, won = new Set(); // won: people who already won (never picked again, even on re-draw)
 function save() {
-  try { sessionStorage.setItem(KEY, JSON.stringify({ platform, url: $('url').value, info, comments, count: $('winners').value, winners: lastWinners, step })); } catch {}
+  try { sessionStorage.setItem(KEY, JSON.stringify({ platform, url: $('url').value, info, comments, count: $('winners').value, winners: lastWinners, won: [...won], step })); } catch {}
 }
 function go(s) { // record a new step in browser history (replace if unchanged)
   step = s;
@@ -81,7 +81,7 @@ function applyPlatformUI(p) {
 }
 function setPlatform(p) { applyPlatformUI(p); $('url').value = ''; resetAll(); go('search'); $('url').focus(); }
 function resetAll() {
-  info = null; comments = []; lastWinners = null; showError('');
+  info = null; comments = []; lastWinners = null; won = new Set(); showError('');
   $('videoCard').hidden = true; $('setupCard').hidden = true; $('progress').hidden = true;
 }
 $('tabs').onclick = (e) => { const b = e.target.closest('.tab'); if (b && b.dataset.p !== platform) setPlatform(b.dataset.p); };
@@ -108,7 +108,7 @@ $('loadBtn').onclick = async () => {
   $('loadBtn').disabled = true; $('setupCard').hidden = true; showError('');
   $('progress').hidden = false; $('progressText').textContent = 'جاري التحميل... 0';
   let warning = '';
-  comments = []; lastWinners = null;
+  comments = []; lastWinners = null; won = new Set();
   try {
     if (info.demo) { await sleep(700); comments = demoComments(); }
     else {
@@ -141,18 +141,22 @@ $('loadBtn').onclick = async () => {
 };
 const personOf = (c) => c.uid || c.name;
 const eligible = () => comments; // every loaded comment takes part, no filtering
-const uniqueCount = () => new Set(eligible().map(personOf)).size;
+const uniqueCount = () => new Set(eligible().map(personOf).filter((k) => !won.has(k))).size; // people still able to win
 function updateSetup() {
   $('cCount').textContent = comments.length;
   $('cUnique').textContent = ` (من ${new Set(comments.map(personOf)).size} شخص)`;
   $('winners').max = uniqueCount();
+  $('wonNote').hidden = !won.size;
+  $('wonCount').textContent = won.size;
 }
 
 // ---------- draw ----------
 function pickWinners(n) { // one random comment per person
   const by = new Map();
-  for (const c of shuffle(eligible())) if (!by.has(personOf(c))) by.set(personOf(c), c);
-  return shuffle([...by.values()]).slice(0, n);
+  for (const c of shuffle(eligible())) { const k = personOf(c); if (!won.has(k) && !by.has(k)) by.set(k, c); } // one random comment per person, skipping earlier winners
+  const picked = shuffle([...by.values()]).slice(0, n);
+  picked.forEach((c) => won.add(personOf(c)));
+  return picked;
 }
 $('startBtn').onclick = () => startDraw();
 async function startDraw() {
@@ -162,7 +166,7 @@ async function startDraw() {
   const btn = $('startBtn'); btn.disabled = true;
   try {
     const max = uniqueCount();
-    if (n > max) return showError(`عدد الفائزين أكبر من عدد المشاركين (${max})`);
+    if (n > max) return showError(`عدد الفائزين أكبر من المتاح (${max})` + (won.size ? ` بعد استبعاد ${won.size} فائز سابق` : ''));
     await runShow(pickWinners(n));
   } catch (err) { showError(err.message); }
   finally { btn.disabled = false; btn.textContent = 'ابدأ السحب'; }
@@ -297,6 +301,7 @@ function stopConfetti() { cancelAnimationFrame(cfRaf); const cv = $('confetti');
   if (saved) {
     platform = saved.platform || 'tiktok'; info = saved.info || null; comments = saved.comments || []; lastWinners = saved.winners || null;
     $('url').value = saved.url || ''; if (saved.count) $('winners').value = saved.count;
+    won = new Set(saved.won || []);
   }
   applyPlatformUI(platform);
   const s = (history.state && history.state.step) || (saved && saved.step) || 'search';
@@ -318,3 +323,5 @@ $('settingsSave').onclick = () => {
   try { localStorage.setItem('giveaway_keys', JSON.stringify(k)); } catch {}
   $('settings').hidden = true; showError('');
 };
+
+$('wonReset').onclick = () => { won = new Set(); updateSetup(); save(); };
